@@ -1,8 +1,9 @@
 from django.urls import path
 from .views import (
-    delete_wedding,
-    get_images_by_event,
-    list_weddings,
+    delete_photo,
+    event_detail,
+    health,
+    my_photos,
     scan_face,
     upload_images,
 )
@@ -10,7 +11,8 @@ from .views import (
 urlpatterns = [
     path("upload-images/", upload_images),
     path("scan-face/", scan_face),
-    path("weddings/", list_weddings),
-    path("delete-wedding/<int:id>/", delete_wedding),
-    path("images/<str:event_id>/", get_images_by_event),
+    path("my-photos/", my_photos),
+    path("event/<str:event_id>/", event_detail),
+    path("photo/<int:id>/", delete_photo),
+    path("health/", health),
 ]

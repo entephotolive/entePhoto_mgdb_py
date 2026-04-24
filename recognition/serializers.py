@@ -19,3 +19,13 @@ class ScanFaceSerializer(serializers.Serializer):
         if not ObjectId.is_valid(value):
             raise serializers.ValidationError("Invalid event_id")
         return value
+
+
+class MyPhotosSerializer(serializers.Serializer):
+    event_id = serializers.CharField()
+    scan_id = serializers.CharField()
+
+    def validate_event_id(self, value):
+        if not ObjectId.is_valid(value):
+            raise serializers.ValidationError("Invalid event_id")
+        return value

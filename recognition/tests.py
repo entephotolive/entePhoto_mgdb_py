@@ -1,8 +1,10 @@
 from unittest.mock import patch
+import io
 
 from django.test import SimpleTestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
 import numpy as np
+from PIL import Image
 from rest_framework.test import APIRequestFactory
 
 from config.mongo import _extract_database_name, _normalize_mongodb_uri
@@ -27,6 +29,11 @@ class UploadImagesViewTests(SimpleTestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
 
+    def _make_test_jpeg(self) -> bytes:
+        buf = io.BytesIO()
+        Image.new("RGB", (1, 1), color=(255, 0, 0)).save(buf, format="JPEG")
+        return buf.getvalue()
+
     def test_upload_images_rejects_invalid_event_id(self):
         request = self.factory.post(
             "/api/upload-images/",
@@ -49,7 +56,7 @@ class UploadImagesViewTests(SimpleTestCase):
             "/api/upload-images/",
             {
                 "event_id": "507f1f77bcf86cd799439011",
-                "images": [SimpleUploadedFile("a.jpg", b"fake", content_type="image/jpeg")],
+                "images": [SimpleUploadedFile("a.jpg", self._make_test_jpeg(), content_type="image/jpeg")],
             },
             format="multipart",
         )
@@ -61,45 +68,40 @@ class UploadImagesViewTests(SimpleTestCase):
         self.assertEqual(response.data["event_id"], "507f1f77bcf86cd799439011")
         mock_assert_ready.assert_called_once()
 
-    @patch("recognition.views.create_face_encoding_for_event")
-    @patch("recognition.views.face_recognition.face_encodings")
-    @patch("recognition.views.face_recognition.face_locations")
-    @patch("recognition.views.face_recognition.load_image_file")
     @patch("recognition.views.create_event_photo")
-    @patch("recognition.views.allocate_image_id")
-    @patch("recognition.views.event_image_name_exists")
+    @patch("recognition.views.insert_face_encodings_for_event")
+    @patch("recognition.views.encode_faces_from_file")
+    @patch("recognition.views.allocate_image_ids")
+    @patch("recognition.views.find_existing_event_image_names")
     @patch("recognition.views.get_event_by_object_id")
     @patch("recognition.views.assert_database_ready")
     def test_upload_images_saves_encodings_for_event(
         self,
         mock_assert_ready,
         mock_get_event,
-        mock_event_image_name_exists,
-        mock_allocate_image_id,
+        mock_find_existing_names,
+        mock_allocate_image_ids,
+        mock_encode_faces_from_file,
+        mock_insert_face_encodings,
         mock_create_event_photo,
-        mock_load_image,
-        mock_face_locations,
-        mock_face_encodings,
-        mock_create_encoding,
     ):
         mock_get_event.return_value = {"_id": object()}
-        mock_event_image_name_exists.return_value = False
-        mock_allocate_image_id.side_effect = [1, 2]
+        mock_find_existing_names.return_value = set()
+        mock_allocate_image_ids.return_value = [1, 2]
         mock_create_event_photo.side_effect = [
             {"id": 1, "has_face": True, "image_url": "/media/public/x.jpg"},
             {"id": 2, "has_face": True, "image_url": "/media/public/y.jpg"},
         ]
-        mock_load_image.return_value = object()
-        mock_face_locations.return_value = [(0, 0, 1, 1)]
-        mock_face_encodings.return_value = [np.zeros(128, dtype=np.float64)]
+        mock_encode_faces_from_file.return_value = [np.zeros(128, dtype=np.float64)]
+        mock_insert_face_encodings.return_value = 1
 
         request = self.factory.post(
             "/api/upload-images/",
             {
                 "event_id": "507f1f77bcf86cd799439011",
                 "images": [
-                    SimpleUploadedFile("a.jpg", b"fake", content_type="image/jpeg"),
-                    SimpleUploadedFile("b.jpg", b"fake", content_type="image/jpeg"),
+                    SimpleUploadedFile("a.jpg", self._make_test_jpeg(), content_type="image/jpeg"),
+                    SimpleUploadedFile("b.jpg", self._make_test_jpeg(), content_type="image/jpeg"),
                 ],
             },
             format="multipart",
@@ -114,30 +116,32 @@ class UploadImagesViewTests(SimpleTestCase):
         self.assertEqual(response.data["data"][0]["event_id"], "507f1f77bcf86cd799439011")
         self.assertEqual(response.data["data"][0]["image_id"], 1)
         self.assertEqual(response.data["data"][0]["image_name"], "a.jpg")
-        self.assertEqual(response.data["data"][0]["face"], True)
-        self.assertEqual(mock_create_encoding.call_count, 2)
+        self.assertEqual(response.data["data"][0]["has_face"], True)
+        self.assertEqual(mock_insert_face_encodings.call_count, 2)
 
-    @patch("recognition.views.face_recognition.load_image_file")
-    @patch("recognition.views.allocate_image_id")
-    @patch("recognition.views.event_image_name_exists")
+    @patch("recognition.views.create_event_photo")
+    @patch("recognition.views.encode_faces_from_file")
+    @patch("recognition.views.allocate_image_ids")
+    @patch("recognition.views.find_existing_event_image_names")
     @patch("recognition.views.get_event_by_object_id")
     @patch("recognition.views.assert_database_ready")
     def test_upload_images_skips_duplicates_before_encoding(
         self,
         mock_assert_ready,
         mock_get_event,
-        mock_event_image_name_exists,
-        mock_allocate_image_id,
-        mock_load_image,
+        mock_find_existing_names,
+        mock_allocate_image_ids,
+        mock_encode_faces_from_file,
+        mock_create_event_photo,
     ):
         mock_get_event.return_value = {"_id": object()}
-        mock_event_image_name_exists.return_value = True
+        mock_find_existing_names.return_value = {"a.jpg"}
 
         request = self.factory.post(
             "/api/upload-images/",
             {
                 "event_id": "507f1f77bcf86cd799439011",
-                "images": [SimpleUploadedFile("a.jpg", b"fake", content_type="image/jpeg")],
+                "images": [SimpleUploadedFile("a.jpg", self._make_test_jpeg(), content_type="image/jpeg")],
             },
             format="multipart",
         )
@@ -148,5 +152,6 @@ class UploadImagesViewTests(SimpleTestCase):
         self.assertEqual(response.data["images_uploaded"], 0)
         self.assertEqual(response.data["images_not_uploaded"], 1)
         self.assertEqual(len(response.data["data"]), 0)
-        self.assertEqual(mock_allocate_image_id.call_count, 0)
-        self.assertEqual(mock_load_image.call_count, 0)
+        mock_allocate_image_ids.assert_called_once_with(0)
+        self.assertEqual(mock_encode_faces_from_file.call_count, 0)
+        self.assertEqual(mock_create_event_photo.call_count, 0)

@@ -207,6 +207,61 @@ def ensure_indexes():
         safe_create_index(database["users"], [("username", ASCENDING)], unique=True, sparse=True, name="user_username")
         safe_create_index(database["users"], [("email", ASCENDING)], unique=True, sparse=True, name="user_email")
 
+        safe_create_index(
+            database["guest_scans"],
+            [("event_id", ASCENDING), ("created_at", DESCENDING)],
+            name="guest_scans_event_created_at",
+        )
+
+        safe_create_index(
+            database["attendees"],
+            [("attendee_id", ASCENDING)],
+            unique=True,
+            name="attendees_attendee_id_unique",
+            partialFilterExpression={"attendee_id": {"$gt": ""}},
+        )
+        safe_create_index(
+            database["attendees"],
+            [("event_id", ASCENDING), ("updated_at", DESCENDING)],
+            name="attendees_event_updated_at",
+        )
+
+        safe_create_index(
+            database["sessions"],
+            [("token_hash", ASCENDING)],
+            unique=True,
+            name="sessions_token_hash_unique",
+            partialFilterExpression={"token_hash": {"$gt": ""}},
+        )
+        safe_create_index(
+            database["sessions"],
+            [("expires_at", ASCENDING)],
+            name="sessions_expires_at_ttl",
+            expireAfterSeconds=0,
+        )
+        safe_create_index(
+            database["sessions"],
+            [("event_id", ASCENDING), ("attendee_id", ASCENDING)],
+            name="sessions_event_attendee",
+        )
+
+        safe_create_index(
+            database["photo_matches"],
+            [("event_id", ASCENDING), ("image_id", ASCENDING), ("attendee_id", ASCENDING)],
+            unique=True,
+            name="photo_matches_unique",
+        )
+        safe_create_index(
+            database["photo_matches"],
+            [("event_id", ASCENDING), ("attendee_id", ASCENDING), ("photo_uploaded_at", DESCENDING)],
+            name="photo_matches_attendee_feed",
+        )
+        safe_create_index(
+            database["photo_matches"],
+            [("event_id", ASCENDING), ("image_id", ASCENDING)],
+            name="photo_matches_event_image",
+        )
+
         _indexes_ready = True
 
 
