@@ -44,6 +44,7 @@ from .services.face_match import (
     match_photo_faces_to_attendees,
 )
 from .tasks import process_event_photo_faces
+from .notify import notify_attendee_new_match
 
 
 def _database_error_response(exc: Exception):
@@ -344,6 +345,21 @@ def upload_images(request):
                             photo_uploaded_at=uploaded_at,
                             matches=matches,
                         )
+                        # Push the new photo to each matched attendee's WebSocket.
+                        image_url = _build_image_url(request, created_photo)
+                        photo_payload = {
+                            "image_id": image_id,
+                            "image_url": image_url,
+                            "image_name": image_name or f"Photo {image_id}",
+                        }
+                        for match in matches:
+                            matched_attendee_id = match.get("attendee_id")
+                            if matched_attendee_id:
+                                notify_attendee_new_match(
+                                    event_id=event_id,
+                                    attendee_id=matched_attendee_id,
+                                    photo=photo_payload,
+                                )
                 except Exception:  # noqa: BLE001
                     delete_event_face_encodings(event_object_id, image_id)
                     delete_photo_document(created_photo)

@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
+    "channels",
     "recognition",
 ]
 
@@ -62,6 +63,15 @@ MIDDLEWARE = [
 
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+
+# Explicitly list allowed WebSocket origins for the Channels AllowedHostsOriginValidator.
+# In production replace with your real domain.
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
 
 CORS_ALLOW_METHODS = [
     "DELETE",
@@ -105,6 +115,16 @@ REST_FRAMEWORK = {
 
 ROOT_URLCONF = "config.urls"
 
+ASGI_APPLICATION = "config.asgi.application"
+
+# In-memory channel layer — zero infra, single-process only.
+# Swap to channels_redis.core.RedisChannelLayer for multi-process / production.
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    }
+}
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -118,7 +138,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "config.wsgi.application"
+WSGI_APPLICATION = "config.wsgi.application"  # Kept for tooling only; server runs via ASGI.
 
 # The app now uses MongoDB Atlas through PyMongo only.
 # Keeping Django's dummy backend here makes any accidental ORM access fail fast.

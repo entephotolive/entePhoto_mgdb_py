@@ -13,6 +13,7 @@ from .repositories import (
 )
 from .services.face_encode import encode_faces_from_path
 from .services.face_match import match_photo_faces_to_attendees
+from .notify import notify_attendee_new_match
 
 
 @shared_task
@@ -39,7 +40,6 @@ def process_event_photo_faces(image_id: int):
 
         inserted = insert_face_encodings_for_event(event_id, image_id, [e.tobytes() for e in encodings])
 
-        # Match new photo faces against existing attendees so `GET /api/my-photos/` updates automatically.
         attendee_cursor = list_attendees_by_event_id(event_id)
         try:
             matches = match_photo_faces_to_attendees(
@@ -57,7 +57,24 @@ def process_event_photo_faces(image_id: int):
         if uploaded_at and matches:
             upsert_photo_matches(event_id, image_id=image_id, photo_uploaded_at=uploaded_at, matches=matches)
 
-        # Promote the photo document to the "has face" collection if it's still in the base collection.
+            # Push the new photo to each matched attendee's WebSocket.
+            image_url = photo_document.get("image_url", "")
+            event_id_str = str(event_id)
+            photo_payload = {
+                "image_id": image_id,
+                "image_url": image_url,
+                "image_name": photo_document.get("image_name") or f"Photo {image_id}",
+            }
+            for match in matches:
+                matched_attendee_id = match.get("attendee_id")
+                if matched_attendee_id:
+                    notify_attendee_new_match(
+                        event_id=event_id_str,
+                        attendee_id=matched_attendee_id,
+                        photo=photo_payload,
+                    )
+
+        # Promote the photo document to the "has face" collection if needed.
         if photo_document.get("_collection") != "image_with_face":
             promote_event_photo_to_has_face(event_id, image_id, face_count=face_count)
         else:
