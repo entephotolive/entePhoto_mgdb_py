@@ -25,8 +25,8 @@
 
 ## Environment Variables
 ```bash
-MONGODB_URI=mongodb+srv://mohammedmizhabdk_db_user:BMV7x8.q4U5![gkk@cluster0.qimfzzm.mongodb.net](mailto:gkk@cluster0.qimfzzm.mongodb.net)/photo-ceremony
-SECRET_KEY=django-insecure-fallback-dev-key-change-in-production
+MONGODB_URI=
+SECRET_KEY=
 DEBUG=True
 ALLOWED_HOSTS=*
 TIME_ZONE=UTC
