@@ -61,7 +61,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # Explicitly list allowed WebSocket origins for the Channels AllowedHostsOriginValidator.
@@ -72,9 +72,11 @@ CORS_ALLOW_CREDENTIALS = True
 #     "http://localhost:8000",
 #     "http://127.0.0.1:8000",
 # ]
-CSRF_TRUSTED_ORIGINS = [
+CORS_ALLOW_ALL_ORIGINS = False
+
+CORS_ALLOWED_ORIGINS = [
     "https://entephoto.co.in",
-    "https://www.entephoto.co.in"
+    "https://www.entephoto.co.in",
 ]
 CORS_ALLOW_METHODS = [
     "DELETE",
@@ -198,3 +200,7 @@ USE_ASYNC_FACE_PROCESSING = get_env_bool("USE_ASYNC_FACE_PROCESSING", bool(CELER
 ADMIN_TOKEN = get_env("ADMIN_TOKEN", "")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+CSRF_COOKIE_SECURE = True
+SECURE_SSL_REDIRECT = False
+
+SESSION_COOKIE_DOMAIN = ".entephoto.co.in"
