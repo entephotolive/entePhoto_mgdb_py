@@ -15,14 +15,14 @@ from recognition.views import upload_images
 # Read from .env instead of hardcoded credentials
 MONGODB_URI = os.getenv(
     "MONGODB_URI",
-    "mongodb+srv://username:password@cluster.mongodb.net/photo-ceremony"
+    "mongodb+srv://entephotolive_db_user:g2tAXGnqMWocYVU5@cluster0.gbx2f3d.mongodb.net/entephoto-db"
 )
 
 
 class MongoUriTests(SimpleTestCase):
     def test_env_uri_is_normalized(self):
         self.assertIn("mongodb+srv://", MONGODB_URI)
-        self.assertEqual(_extract_database_name(MONGODB_URI), "photo-ceremony")
+        self.assertEqual(_extract_database_name(MONGODB_URI), "entephoto-db")
 
 
 class UploadImagesViewTests(SimpleTestCase):
