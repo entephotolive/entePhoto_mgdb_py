@@ -12,15 +12,13 @@ from config.mongo import _extract_database_name, _normalize_mongodb_uri
 from recognition.views import upload_images
 
 
-# Read from .env instead of hardcoded credentials
-MONGODB_URI = os.getenv(
-    "MONGODB_URI",
-    "mongodb+srv://entephotolive_db_user:g2tAXGnqMWocYVU5@cluster0.gbx2f3d.mongodb.net/entephoto-db"
-)
+# Read MongoDB URL only from .env
+MONGODB_URI = os.getenv("MONGODB_URI")
 
 
 class MongoUriTests(SimpleTestCase):
-    def test_env_uri_is_normalized(self):
+    def test_env_uri_is_loaded(self):
+        self.assertIsNotNone(MONGODB_URI)
         self.assertIn("mongodb+srv://", MONGODB_URI)
         self.assertEqual(_extract_database_name(MONGODB_URI), "entephoto-db")
 
@@ -47,14 +45,22 @@ class UploadImagesViewTests(SimpleTestCase):
 
     @patch("recognition.views.get_event_by_object_id")
     @patch("recognition.views.assert_database_ready")
-    def test_upload_images_returns_404_when_event_missing(self, mock_assert_ready, mock_get_event):
+    def test_upload_images_returns_404_when_event_missing(
+        self, mock_assert_ready, mock_get_event
+    ):
         mock_get_event.return_value = None
 
         request = self.factory.post(
             "/api/upload-images/",
             {
                 "event_id": "507f1f77bcf86cd799439011",
-                "images": [SimpleUploadedFile("a.jpg", self._make_test_jpeg(), content_type="image/jpeg")],
+                "images": [
+                    SimpleUploadedFile(
+                        "a.jpg",
+                        self._make_test_jpeg(),
+                        content_type="image/jpeg"
+                    )
+                ],
             },
             format="multipart",
         )
@@ -83,10 +89,11 @@ class UploadImagesViewTests(SimpleTestCase):
         mock_get_event.return_value = {"_id": object()}
         mock_find_existing_names.return_value = set()
         mock_allocate_image_ids.return_value = [1]
+
         mock_create_event_photo.return_value = {
             "id": 1,
             "has_face": True,
-            "image_url": "/media/public/x.jpg"
+            "image_url": "/media/public/x.jpg",
         }
 
         mock_encode_faces_from_file.return_value = [np.zeros(128)]
