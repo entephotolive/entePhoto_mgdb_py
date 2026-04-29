@@ -137,6 +137,9 @@ def ensure_indexes():
         # Remove legacy hash-based uniqueness that breaks inserts when `hash` is missing/null.
         safe_drop_index(database["photos"], "hash_1")
         safe_drop_index(database["image_with_face"], "hash_1")
+        # Remove legacy 'name' unique index — schema now uses 'image_name', so this
+        # index was causing DuplicateKeyError for every second no-face image (null == null).
+        safe_drop_index(database["photos"], "name_1")
 
         safe_create_index(database["weddings"], [("id", ASCENDING)], unique=True, name="wedding_public_id")
         safe_create_index(database["weddings"], [("created_by.username", ASCENDING)], name="wedding_created_by_username")
