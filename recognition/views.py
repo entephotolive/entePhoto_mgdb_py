@@ -298,9 +298,6 @@ def upload_images(request):
             face_count = len(encodings or [])
             has_face = face_count > 0
 
-            if not has_face:
-                images_without_face += 1
-
             _rewind(uploaded_image)
             created_photo = create_event_photo(
                 event_object_id,
@@ -311,6 +308,9 @@ def upload_images(request):
                 faces_processed=True,
                 folder_id=folder_id,
             )
+            # ✅ Only count AFTER successful DB save
+            if not has_face:
+                images_without_face += 1
             if image_name:
                 seen_names.add(image_name)
 
@@ -663,3 +663,4 @@ def delete_photo(request, id: int):
 
 
 delete_photo.throttle_scope = "upload"
+
