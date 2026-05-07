@@ -45,6 +45,12 @@ ALLOWED_HOSTS = [host.strip() for host in get_env("ALLOWED_HOSTS", "*").split(",
 MONGODB_URI = get_env("MONGODB_URI", required=True)
 
 INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
