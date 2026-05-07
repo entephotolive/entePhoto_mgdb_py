@@ -164,10 +164,10 @@ WSGI_APPLICATION = "config.wsgi.application"  # Kept for tooling only; server ru
 # Keeping Django's dummy backend here makes any accidental ORM access fail fast.
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.dummy",
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
 }
-
 AUTH_PASSWORD_VALIDATORS = []
 
 LANGUAGE_CODE = "en-us"
