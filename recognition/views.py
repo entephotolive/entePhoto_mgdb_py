@@ -9,7 +9,7 @@ from PIL import Image, UnidentifiedImageError
 from pymongo.errors import PyMongoError
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-
+import numpy as np
 from config.mongo import assert_database_ready, ping_database
 from .repositories import (
     allocate_image_ids,
@@ -316,11 +316,18 @@ def upload_images(request):
 
             if has_face:
                 try:
+                    for encoding in encodings:
+                        print("UPLOAD FIRST 5:", encoding[:5])
+                        print("UPLOAD VECTOR LENGTH:", len(encoding))
+                        print("UPLOAD NORM:", np.linalg.norm(encoding))
+                        print("UPLOAD DTYPE:", encoding.dtype)
+                        
                     inserted = insert_face_encodings_for_event(
                         event_object_id,
                         image_id,
                         [encoding.tobytes() for encoding in encodings],
                     )
+                    
                     total_faces_detected += inserted
 
                     # Match this photo against existing attendees so they see new photos without rescanning.
@@ -418,11 +425,19 @@ def scan_face(request):
         _rewind(file_obj)
         try:
             guest_encoding = encode_single_face_from_file(file_obj)
+            print("SCAN FIRST 5:", guest_encoding[:5])
         except ValueError:
             return Response({"error": "Multiple faces detected"}, status=400)
 
         if guest_encoding is None:
             return Response({"error": "No face found"}, status=400)
+        
+        print("SCAN VECTOR LENGTH:", len(guest_encoding))
+        print("SCAN NORM:", np.linalg.norm(guest_encoding))
+        print("SCAN DTYPE:", guest_encoding.dtype)
+        print("FACE MATCH TOLERANCE:", settings.FACE_MATCH_TOLERANCE)
+
+
 
         attendee_cursor = list_attendees_by_event_id(event_object_id)
         try:
@@ -465,6 +480,9 @@ def scan_face(request):
                     guest_encoding,
                     tolerance=settings.FACE_MATCH_TOLERANCE,
                 )
+                print("GUEST VECTOR LENGTH:", len(guest_encoding))
+                print("IMAGE MATCHES:", image_matches)
+                print("MATCH COUNT:", len(image_matches))
             finally:
                 try:
                     cursor.close()

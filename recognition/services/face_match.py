@@ -5,7 +5,7 @@ from collections.abc import Iterable
 import numpy as np
 
 
-DEFAULT_TOLERANCE = 0.5
+DEFAULT_TOLERANCE = 1.0
 DEFAULT_BATCH_SIZE = 1024
 
 
@@ -21,7 +21,7 @@ def find_matching_image_ids(
     `face_documents` should yield dicts with keys: `image_id` and `encoding` (bytes-like).
     """
 
-    guest = np.asarray(guest_encoding, dtype=np.float64)
+    guest = np.asarray(guest_encoding, dtype=np.float32)
     best_distance_by_image: dict[int, float] = {}
 
     batch_encodings: list[np.ndarray] = []
@@ -30,7 +30,7 @@ def find_matching_image_ids(
     def flush():
         if not batch_encodings:
             return
-        known = np.vstack(batch_encodings)  # (n, 128)
+        known = np.vstack(batch_encodings)  # (n, 512)
         distances = np.linalg.norm(known - guest, axis=1)
         for img_id, dist in zip(batch_image_ids, distances, strict=True):
             if dist <= tolerance:
@@ -46,8 +46,8 @@ def find_matching_image_ids(
             encoding_bytes = doc.get("encoding")
             if not encoding_bytes:
                 continue
-            encoding = np.frombuffer(encoding_bytes, dtype=np.float64)
-            if encoding.shape[0] != 128:
+            encoding = np.frombuffer(encoding_bytes, dtype=np.float32)
+            if encoding.shape[0] != 512:
                 continue
         except Exception:  # noqa: BLE001
             continue
@@ -69,7 +69,7 @@ def find_matching_image_ids_with_distances(
     tolerance: float = DEFAULT_TOLERANCE,
     batch_size: int = DEFAULT_BATCH_SIZE,
 ) -> list[tuple[int, float]]:
-    guest = np.asarray(guest_encoding, dtype=np.float64)
+    guest = np.asarray(guest_encoding, dtype=np.float32)
     best_distance_by_image: dict[int, float] = {}
 
     batch_encodings: list[np.ndarray] = []
@@ -79,7 +79,25 @@ def find_matching_image_ids_with_distances(
         if not batch_encodings:
             return
         known = np.vstack(batch_encodings)
+        
+       
+        
+        print("GUEST SHAPE:", guest.shape)
+        print("KNOWN SHAPE:", known.shape)
+
+        print("GUEST NORM:", np.linalg.norm(guest))
+        print("KNOWN NORM:", np.linalg.norm(known[0]))
+
+        print("GUEST FIRST 5:", guest[:5])
+        print("KNOWN FIRST 5:", known[0][:5])
+
         distances = np.linalg.norm(known - guest, axis=1)
+
+        print("MIN DISTANCE:", float(np.min(distances)))
+        print("ALL DISTANCES:", distances[:10])
+        
+        
+        
         for img_id, dist in zip(batch_image_ids, distances, strict=True):
             if dist <= tolerance:
                 prev = best_distance_by_image.get(img_id)
@@ -94,8 +112,8 @@ def find_matching_image_ids_with_distances(
             encoding_bytes = doc.get("encoding")
             if not encoding_bytes:
                 continue
-            encoding = np.frombuffer(encoding_bytes, dtype=np.float64)
-            if encoding.shape[0] != 128:
+            encoding = np.frombuffer(encoding_bytes, dtype=np.float32)
+            if encoding.shape[0] != 512:
                 continue
         except Exception:  # noqa: BLE001
             continue
@@ -118,7 +136,7 @@ def find_matching_attendee_id(
     batch_size: int = DEFAULT_BATCH_SIZE,
 ) -> tuple[str, float] | None:
     """Return (attendee_id, distance) for the best match, or None."""
-    guest = np.asarray(guest_encoding, dtype=np.float64)
+    guest = np.asarray(guest_encoding, dtype=np.float32)
 
     best_attendee_id: str | None = None
     best_distance: float | None = None
@@ -147,8 +165,8 @@ def find_matching_attendee_id(
         if not encoding_bytes:
             continue
         try:
-            encoding = np.frombuffer(encoding_bytes, dtype=np.float64)
-            if encoding.shape[0] != 128:
+            encoding = np.frombuffer(encoding_bytes, dtype=np.float32)
+            if encoding.shape[0] != 512:
                 continue
         except Exception:  # noqa: BLE001
             continue
@@ -187,8 +205,8 @@ def match_photo_faces_to_attendees(
         if not attendee_id or not embedding_bytes:
             continue
         try:
-            emb = np.frombuffer(embedding_bytes, dtype=np.float64)
-            if emb.shape[0] != 128:
+            emb = np.frombuffer(embedding_bytes, dtype=np.float32)
+            if emb.shape[0] != 512:
                 continue
         except Exception:  # noqa: BLE001
             continue
@@ -198,11 +216,11 @@ def match_photo_faces_to_attendees(
     if not attendee_encodings:
         return []
 
-    known = np.vstack(attendee_encodings)  # (n, 128)
+    known = np.vstack(attendee_encodings)  # (n, 512)
     best_distance: dict[str, float] = {}
 
     for face in face_encodings:
-        face_vec = np.asarray(face, dtype=np.float64)
+        face_vec = np.asarray(face, dtype=np.float32)
         distances = np.linalg.norm(known - face_vec, axis=1)
         for attendee_id, dist in zip(attendee_ids, distances, strict=True):
             if dist <= tolerance:

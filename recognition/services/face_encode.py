@@ -2,85 +2,153 @@ from __future__ import annotations
 
 from typing import IO
 
-import face_recognition
+import cv2
 import numpy as np
+from insightface.app import FaceAnalysis
 from PIL import Image
 
-
 # ---------------------------------------------------------------------------
-# Internal helper
+# InsightFace Initialization
 # ---------------------------------------------------------------------------
+app = FaceAnalysis(
+    name="buffalo_l",
+    providers=["CPUExecutionProvider"],
+)
 
-_MAX_DETECTION_PX = 1000  # longest side; face detection accuracy is fine at this size
+app.prepare(
+    ctx_id=-1,
+    det_size=(640, 640),
+)
+_MAX_DETECTION_PX = 3000
+# _MAX_DETECTION_PX = 1000
 
 
 def _resize_for_detection(image_array: np.ndarray) -> np.ndarray:
-    """Downscale to _MAX_DETECTION_PX on the longest side before face detection.
-
-    Face detection speed is roughly O(pixels), so halving the longest side cuts
-    detection time by ~4×.  The 128-d face encoding is size-invariant once the
-    face region is located, so accuracy is not affected.
-    """
     h, w = image_array.shape[:2]
     longest = max(h, w)
+
     if longest <= _MAX_DETECTION_PX:
         return image_array
+
     scale = _MAX_DETECTION_PX / longest
-    new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
-    pil_img = Image.fromarray(image_array)
+
+    new_w = max(1, int(w * scale))
+    new_h = max(1, int(h * scale))
+
+    # InsightFace receives OpenCV BGR arrays. Convert only for PIL resizing,
+    # then convert back so detector input remains in the expected color order.
+    rgb_image = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
+    pil_img = Image.fromarray(rgb_image)
     pil_img = pil_img.resize((new_w, new_h), Image.LANCZOS)
-    return np.array(pil_img)
+
+    return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+
+
+def _face_embedding(face) -> np.ndarray:
+    embedding = getattr(face, "normed_embedding", None)
+    if embedding is None:
+        embedding = face.embedding
+        norm = np.linalg.norm(embedding)
+        if norm > 0:
+            embedding = embedding / norm
+
+    return np.asarray(embedding, dtype=np.float32)
 
 
 def encode_faces_from_array(image_array: np.ndarray) -> list[np.ndarray]:
-    small = _resize_for_detection(image_array)
-    face_locations = face_recognition.face_locations(small)
-    return face_recognition.face_encodings(small, face_locations)
+    image_array = _resize_for_detection(image_array)
+
+    faces = app.get(image_array)
+
+    embeddings = []
+
+    for face in faces:
+        embeddings.append(_face_embedding(face))
+
+    return embeddings
 
 
 def encode_faces_from_file(file_obj: IO[bytes]) -> list[np.ndarray]:
-    image_array = face_recognition.load_image_file(file_obj)
-    return encode_faces_from_array(image_array)
+    image_bytes = np.frombuffer(
+        file_obj.read(),
+        dtype=np.uint8,
+    )
+
+    image = cv2.imdecode(
+        image_bytes,
+        cv2.IMREAD_COLOR,
+    )
+
+    if image is None:
+        return []
+
+    return encode_faces_from_array(image)
 
 
 def encode_faces_from_path(image_path: str) -> list[np.ndarray]:
-    image_array = face_recognition.load_image_file(image_path)
-    return encode_faces_from_array(image_array)
+    image = cv2.imread(image_path)
+
+    if image is None:
+        return []
+
+    return encode_faces_from_array(image)
 
 
 def encode_primary_face_from_file(file_obj: IO[bytes]) -> np.ndarray | None:
-    image_array = face_recognition.load_image_file(file_obj)
-    small = _resize_for_detection(image_array)
-    face_locations = face_recognition.face_locations(small)
-    if not face_locations:
+    image_bytes = np.frombuffer(
+        file_obj.read(),
+        dtype=np.uint8,
+    )
+
+    image = cv2.imdecode(
+        image_bytes,
+        cv2.IMREAD_COLOR,
+    )
+
+    if image is None:
         return None
 
-    encodings = face_recognition.face_encodings(small, face_locations)
-    if not encodings:
+    image = _resize_for_detection(image)
+
+    faces = app.get(image)
+
+    if not faces:
         return None
 
-    def area(loc):
-        top, right, bottom, left = loc
-        return max(0, bottom - top) * max(0, right - left)
+    largest_face = max(
+        faces,
+        key=lambda face: (
+            face.bbox[2] - face.bbox[0]
+        ) * (
+            face.bbox[3] - face.bbox[1]
+        ),
+    )
 
-    largest_index = max(range(len(face_locations)), key=lambda idx: area(face_locations[idx]))
-    return encodings[largest_index]
+    return _face_embedding(largest_face)
 
 
 def encode_single_face_from_file(file_obj: IO[bytes]) -> np.ndarray | None:
-    """Return the only face encoding in the image; reject group shots.
+    image_bytes = np.frombuffer(
+        file_obj.read(),
+        dtype=np.uint8,
+    )
 
-    Returns None when zero faces are found.
-    Raises ValueError when multiple faces are found.
-    """
-    image_array = face_recognition.load_image_file(file_obj)
-    small = _resize_for_detection(image_array)
-    face_locations = face_recognition.face_locations(small)
-    if not face_locations:
+    image = cv2.imdecode(
+        image_bytes,
+        cv2.IMREAD_COLOR,
+    )
+
+    if image is None:
         return None
-    if len(face_locations) != 1:
+
+    image = _resize_for_detection(image)
+
+    faces = app.get(image)
+
+    if len(faces) == 0:
+        return None
+
+    if len(faces) > 1:
         raise ValueError("Multiple faces detected")
-    encodings = face_recognition.face_encodings(small, face_locations)
-    if not encodings:
-        return None
-    return encodings[0]
+
+    return _face_embedding(faces[0])

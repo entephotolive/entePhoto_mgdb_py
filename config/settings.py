@@ -87,6 +87,8 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
 
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
     "https://entephoto.co.in",
     "https://www.entephoto.co.in",
 ]
@@ -192,9 +194,10 @@ ALLOWED_IMAGE_MIME_TYPES = {
     for t in get_env("ALLOWED_IMAGE_MIME_TYPES", "image/jpeg,image/png,image/webp").split(",")
     if t.strip()
 }
-
+FACE_MATCH_TOLERANCE=1.0
 # Face matching tuning.
-FACE_MATCH_TOLERANCE = float(get_env("FACE_MATCH_TOLERANCE", "0.5"))
+FACE_MATCH_THRESHOLD = float(get_env("FACE_MATCH_THRESHOLD", "0.55"))
+# FACE_MATCH_TOLERANCE = float(get_env("FACE_MATCH_TOLERANCE", "0.5"))
 MAX_MATCHED_PHOTOS = get_env_int("MAX_MATCHED_PHOTOS", 200)
 
 # Attendee session cookie.
@@ -215,7 +218,9 @@ USE_ASYNC_FACE_PROCESSING = get_env_bool("USE_ASYNC_FACE_PROCESSING", bool(CELER
 ADMIN_TOKEN = get_env("ADMIN_TOKEN", "")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = False
 SECURE_SSL_REDIRECT = False
 
-SESSION_COOKIE_DOMAIN = ".entephoto.co.in"
+# SESSION_COOKIE_DOMAIN = ".entephoto.co.in"
+
+SESSION_COOKIE_DOMAIN = get_env("SESSION_COOKIE_DOMAIN", None)
