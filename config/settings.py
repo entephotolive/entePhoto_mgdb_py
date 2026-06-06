@@ -41,7 +41,7 @@ SECRET_KEY = get_env(
     "django-insecure-fallback-dev-key-change-in-production",
 )
 DEBUG = get_env_bool("DEBUG", False)
-ALLOWED_HOSTS = [host.strip() for host in get_env("ALLOWED_HOSTS", "*").split(",") if host.strip()]
+ALLOWED_HOSTS = [host.strip() for host in get_env("ALLOWED_HOSTS").split(",") if host.strip()]
 MONGODB_URI = get_env("MONGODB_URI", required=True)
 
 INSTALLED_APPS = [
@@ -87,8 +87,7 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+
     "https://entephoto.co.in",
     "https://www.entephoto.co.in",
 ]
@@ -182,7 +181,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = "/var/www/media"
 
 MAX_UPLOAD_MB = get_env_int("MAX_UPLOAD_MB", 10)
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
@@ -218,9 +217,9 @@ USE_ASYNC_FACE_PROCESSING = get_env_bool("USE_ASYNC_FACE_PROCESSING", bool(CELER
 ADMIN_TOKEN = get_env("ADMIN_TOKEN", "")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-CSRF_COOKIE_SECURE = False
-SECURE_SSL_REDIRECT = False
+CSRF_COOKIE_SECURE = True
+SECURE_SSL_REDIRECT = True
 
-# SESSION_COOKIE_DOMAIN = ".entephoto.co.in"
+SESSION_COOKIE_DOMAIN = ".entephoto.co.in"
 
 SESSION_COOKIE_DOMAIN = get_env("SESSION_COOKIE_DOMAIN", None)
