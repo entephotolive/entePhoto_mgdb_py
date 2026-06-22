@@ -45,7 +45,7 @@ from .services.face_match import (
 )
 from .tasks import process_event_photo_faces
 from .notify import notify_attendee_new_match
-
+from .repositories import cleanup_events_expired_after_10_days
 
 def _database_error_response(exc: Exception):
     return Response({"error": "Database operation failed", "details": str(exc)}, status=500)
@@ -682,3 +682,24 @@ def delete_photo(request, id: int):
 
 delete_photo.throttle_scope = "upload"
 
+
+
+@api_view(["GET", "POST"])
+def cleanup_expired_events(request):
+    if not settings.ADMIN_TOKEN:
+        return Response({"error": "Admin token not configured"}, status=403)
+
+    provided = request.headers.get("X-Admin-Token") or request.META.get("HTTP_X_ADMIN_TOKEN") or ""
+    if provided != settings.ADMIN_TOKEN:
+        return Response({"error": "Forbidden"}, status=403)
+
+    try:
+        assert_database_ready()
+        result = cleanup_events_expired_after_10_days()
+    except (PyMongoError, ImproperlyConfigured, ValueError) as exc:
+        return _database_error_response(exc)
+
+    return Response({
+        "success": True,
+        **result,
+    })

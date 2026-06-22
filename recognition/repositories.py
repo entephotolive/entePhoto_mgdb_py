@@ -15,7 +15,7 @@ from pymongo.errors import DuplicateKeyError
 
 from config.mongo import ensure_indexes, get_database
 
-
+import shutil
 EVENTS_COLLECTION = "events"
 PHOTOS_COLLECTION = "photos"
 IMAGES_WITH_FACE_COLLECTION = "image_with_face"
@@ -26,7 +26,7 @@ ATTENDEES_COLLECTION = "attendees"
 SESSIONS_COLLECTION = "sessions"
 PHOTO_MATCHES_COLLECTION = "photo_matches"
 
-
+FOLDERS_COLLECTION = "folders"
 def _database():
     ensure_indexes()
     return get_database()
@@ -501,3 +501,60 @@ def get_scan(event_object_id: ObjectId, scan_id: str):
     if not ObjectId.is_valid(scan_id):
         return None
     return _collection(SCANS_COLLECTION).find_one({"_id": ObjectId(scan_id), "event_id": event_object_id})
+
+
+
+def cleanup_events_expired_after_10_days() -> dict:
+    now = _now()
+    cutoff_date = now - timedelta(days=10)
+
+    expired_events = list(
+        _collection(EVENTS_COLLECTION).find(
+            {"date": {"$lte": cutoff_date}},
+            {"_id": 1, "date": 1, "title": 1},
+        )
+    )
+
+    deleted_events = 0
+    deleted_photos = 0
+
+    for event in expired_events:
+        event_object_id = event["_id"]
+        event_id_str = str(event_object_id)
+
+        event_filters = [
+            {"event_id": event_object_id},
+            {"event_id": event_id_str},
+            {"eventId": event_object_id},
+            {"eventId": event_id_str},
+        ]
+
+        # Delete physical event folder: media/public/<event_id>
+        event_folder = Path(settings.MEDIA_ROOT) / "public" / event_id_str
+        if event_folder.exists():
+            shutil.rmtree(event_folder)
+
+        # Count before delete
+        for filter_query in event_filters:
+            deleted_photos += _collection(PHOTOS_COLLECTION).count_documents(filter_query)
+            deleted_photos += _collection(IMAGES_WITH_FACE_COLLECTION).count_documents(filter_query)
+
+        # Delete photo documents
+        for filter_query in event_filters:
+            _collection(PHOTOS_COLLECTION).delete_many(filter_query)
+            _collection(IMAGES_WITH_FACE_COLLECTION).delete_many(filter_query)
+            _collection(FACE_ENCODINGS_COLLECTION).delete_many(filter_query)
+            _collection(PHOTO_MATCHES_COLLECTION).delete_many(filter_query)
+            _collection(ATTENDEES_COLLECTION).delete_many(filter_query)
+            _collection(SESSIONS_COLLECTION).delete_many(filter_query)
+            _collection(SCANS_COLLECTION).delete_many(filter_query)
+            _collection(FOLDERS_COLLECTION).delete_many(filter_query)
+
+        # Delete event itself
+        _collection(EVENTS_COLLECTION).delete_one({"_id": event_object_id})
+        deleted_events += 1
+
+    return {
+        "deleted_events": deleted_events,
+        "deleted_photos": deleted_photos,
+    }
