@@ -308,7 +308,7 @@ def upload_images(request):
                 faces_processed=True,
                 folder_id=folder_id,
             )
-            # ✅ Only count AFTER successful DB save
+            #  Only count AFTER successful DB save
             if not has_face:
                 images_without_face += 1
             if image_name:

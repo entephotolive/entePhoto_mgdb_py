@@ -43,7 +43,7 @@ SECRET_KEY = get_env(
 DEBUG = get_env_bool("DEBUG", False)
 ALLOWED_HOSTS = [host.strip() for host in get_env("ALLOWED_HOSTS").split(",") if host.strip()]
 MONGODB_URI = get_env("MONGODB_URI", required=True)
-
+GOOGLE_CLIENT_ID = get_env("GOOGLE_CLIENT_ID", required=True)
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -55,6 +55,8 @@ INSTALLED_APPS = [
     "corsheaders",
     "channels",
     "recognition",
+    "rest_framework_simplejwt",
+    "mobile_auth",
 ]
 
 MIDDLEWARE = [
@@ -114,7 +116,8 @@ CORS_ALLOW_HEADERS = [
 ]
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+         "rest_framework_simplejwt.authentication.JWTAuthentication",],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
     ],

@@ -17,7 +17,10 @@ from django.urls import include, path
 urlpatterns = [
     path("admin-django/", admin.site.urls),   # Django Admin Panel
     path("api/", include("recognition.urls")),
+    path("api/mobile/", include("mobile_auth.urls")),
 ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+
