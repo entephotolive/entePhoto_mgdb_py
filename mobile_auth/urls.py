@@ -1,9 +1,11 @@
 from django.urls import path
-from .views import GoogleMobileLoginAPIView, PhotographerFoldersAPIView
+from rest_framework_simplejwt.views import TokenRefreshView
+from .views import GoogleMobileLoginAPIView, PhotographerEventsAPIView
 
 urlpatterns = [
     path("auth/google/", GoogleMobileLoginAPIView.as_view()),
-    path("events/", PhotographerFoldersAPIView.as_view()),
+    path("auth/token/refresh/", TokenRefreshView.as_view()),
+    path("events/", PhotographerEventsAPIView.as_view()),
 ]
 
 

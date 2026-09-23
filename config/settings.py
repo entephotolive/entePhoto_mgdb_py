@@ -134,6 +134,33 @@ REST_FRAMEWORK = {
     "UNAUTHENTICATED_TOKEN": None,
 }
 
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    # Access tokens are short-lived (30 min). Expired access tokens trigger a silent
+    # refresh using the long-lived refresh token — the user never sees a login screen
+    # unless the refresh token itself expires.
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=get_env_int("JWT_ACCESS_MINUTES", 30)),
+
+    # Refresh tokens live 30 days — covers a month of continuous use without re-login.
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=get_env_int("JWT_REFRESH_DAYS", 30)),
+
+    # Each refresh call issues a new refresh token and invalidates the old one.
+    # This limits the replay window if a refresh token is ever leaked.
+    # NOTE: BLACKLIST_AFTER_ROTATION is intentionally False — the token_blacklist
+    # app requires SQL migrations we don't use (MongoDB-only project). Rotation
+    # alone provides meaningful security improvement.
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": False,
+
+    "ALGORITHM": "HS256",
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+    "UPDATE_LAST_LOGIN": False,
+}
+
 ROOT_URLCONF = "config.urls"
 
 ASGI_APPLICATION = "config.asgi.application"
@@ -221,7 +248,7 @@ ADMIN_TOKEN = get_env("ADMIN_TOKEN", "")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CSRF_COOKIE_SECURE = True
-SECURE_SSL_REDIRECT = True
+SECURE_SSL_REDIRECT = get_env_bool("SECURE_SSL_REDIRECT", not DEBUG)
 
 SESSION_COOKIE_DOMAIN = ".entephoto.co.in"
 

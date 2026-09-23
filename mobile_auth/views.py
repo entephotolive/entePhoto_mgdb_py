@@ -7,10 +7,44 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTStatelessUserAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken
 from bson import ObjectId
 from datetime import datetime
 
-from .db import users_collection, folders_collection
+from .db import users_collection, folders_collection, events_collection
+
+
+class _PhotographerUser:
+    """
+    Minimal user-like object returned by PhotographerJWTAuthentication.
+
+    Django's IsAuthenticated permission checks `request.user.is_authenticated`.
+    We cannot use AnonymousUser (its is_authenticated is always False), and we
+    don't want a DB-backed User object because we use MongoDB with no Django ORM.
+    This lightweight stand-in satisfies the permission check.
+    """
+    is_authenticated = True
+    is_active = True
+
+
+class PhotographerJWTAuthentication(JWTStatelessUserAuthentication):
+    """
+    Custom JWT authenticator for photographer mobile tokens.
+
+    The tokens issued by GoogleMobileLoginAPIView do NOT carry a 'user_id' claim
+    (they use 'photographer_id' instead), so the stock JWTStatelessUserAuthentication
+    raises "Token contained no recognizable user identification".
+
+    This subclass overrides get_user() to skip any DB / user_id lookup and
+    return a _PhotographerUser so that IsAuthenticated passes.
+    The raw validated token is available to views via request.auth.
+    """
+
+    def get_user(self, validated_token):
+        photographer_id = validated_token.get("photographer_id")
+        if not photographer_id:
+            raise InvalidToken("Token contained no photographer_id claim")
+        return _PhotographerUser()
 
 
 class GoogleMobileLoginAPIView(APIView):
@@ -107,8 +141,8 @@ class GoogleMobileLoginAPIView(APIView):
         })
 
 
-class PhotographerFoldersAPIView(APIView):
-    authentication_classes = [JWTStatelessUserAuthentication]
+class PhotographerEventsAPIView(APIView):
+    authentication_classes = [PhotographerJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -120,22 +154,23 @@ class PhotographerFoldersAPIView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        folders = folders_collection.find({
+        events = events_collection.find({
             "createdBy": ObjectId(photographer_id),
         }).sort("createdAt", -1)
 
         data = []
 
-        for folder in folders:
+        for event in events:
             data.append({
-                "id": str(folder["_id"]),
-                "name": folder.get("name"),
-                "slug": folder.get("slug"),
-                "photoCount": folder.get("photoCount", 0),
-                "eventId": str(folder.get("eventId")) if folder.get("eventId") else None,
-                "createdAt": folder.get("createdAt"),
+                "id": str(event["_id"]),
+                "title": event.get("title"),
+                "date": event.get("date"),
+                "location": event.get("location"),
+                "photoCount": event.get("photoCount", 0),
+                "createdAt": event.get("createdAt"),
+                "updatedAt": event.get("updatedAt"),
             })
 
         return Response({
-            "folders": data,
+            "events": data,
         })

@@ -1,0 +1,25 @@
+# Core Django
+Django==5.2.13
+djangorestframework==3.17.1
+djangorestframework_simplejwt==5.5.1
+django-cors-headers==4.9.0
+
+# ASGI server
+uvicorn==0.34.3
+channels==4.3.2
+asgiref==3.11.1
+
+# MongoDB
+pymongo==4.12.1
+dnspython==2.8.0
+
+# Google Auth (for id_token verification)
+google-auth==2.38.0
+
+# Env & utils
+python-dotenv==1.2.2
+whitenoise==6.9.0
+cryptography==44.0.3
+
+# JWT deps
+PyJWT==2.10.1
