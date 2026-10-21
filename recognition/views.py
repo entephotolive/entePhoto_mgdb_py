@@ -35,7 +35,7 @@ from .repositories import (
     upsert_attendee_photo_matches,
     upsert_photo_matches,
 )
-from .serializers import MyPhotosSerializer, ScanFaceSerializer, UploadImagesSerializer
+from .serializers import MyPhotosSerializer, ScanFaceSerializer, UploadImagesSerializer, CheckExistingPhotosSerializer
 from .services.face_encode import encode_faces_from_file, encode_single_face_from_file
 from .services.face_match import (
     find_matching_attendee_id,
@@ -703,3 +703,131 @@ def cleanup_expired_events(request):
         "success": True,
         **result,
     })
+    
+    
+#--------------
+
+@api_view(["POST"])
+def check_existing_photos(request):
+    serializer = CheckExistingPhotosSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response(
+            {
+                "error": "Invalid request",
+                "details": serializer.errors,
+            },
+            status=400,
+        )
+
+    event_id = serializer.validated_data["event_id"]
+    folder_id = serializer.validated_data.get("folder_id")
+    image_names = serializer.validated_data["image_names"]
+
+    event_object_id, _event, error_response = _require_event(event_id)
+    if error_response is not None:
+        return error_response
+
+    try:
+        # Load saved photo metadata, not the image files.
+        saved_photos = list_event_photos(event_object_id)
+
+        # Restrict the comparison to the requested folder.
+        existing_names = {
+            photo.get("image_name")
+            for photo in saved_photos
+            if photo.get("image_name")
+            and (
+                str(photo.get("folder_id") or "") == str(folder_id or "")
+            )
+        }
+
+        # Deduplicate incoming filenames while preserving their order.
+        unique_names = list(dict.fromkeys(image_names))
+
+        already_uploaded = [
+            name for name in unique_names
+            if name in existing_names
+        ]
+
+        new_images = [
+            name for name in unique_names
+            if name not in existing_names
+        ]
+
+    except (PyMongoError, ImproperlyConfigured, ValueError) as exc:
+        return _database_error_response(exc)
+
+    return Response({
+        "success": True,
+        "event_id": event_id,
+        "folder_id": folder_id,
+        "total_checked": len(unique_names),
+        "already_uploaded_count": len(already_uploaded),
+        "new_images_count": len(new_images),
+        "already_uploaded": already_uploaded,
+        "new_images": new_images,
+    })
+
+
+check_existing_photos.throttle_scope = "read"
+
+
+
+#-----------------------
+
+@api_view(["POST"])
+def check_existing_photos(request):
+    serializer = CheckExistingPhotosSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response(
+            {
+                "error": "Invalid request",
+                "details": serializer.errors,
+            },
+            status=400,
+        )
+
+    event_id = serializer.validated_data["event_id"]
+    image_names = serializer.validated_data["image_names"]
+
+    event_object_id, _event, error_response = _require_event(event_id)
+    if error_response is not None:
+        return error_response
+
+    try:
+        # Remove duplicate filenames from the request, preserving order.
+        unique_names = list(dict.fromkeys(image_names))
+
+        # Get filenames already saved for this event.
+        existing_names = find_existing_event_image_names(
+            event_object_id,
+            unique_names,
+        )
+
+        already_uploaded = [
+            name for name in unique_names
+            if name in existing_names
+        ]
+
+        new_images = [
+            name for name in unique_names
+            if name not in existing_names
+        ]
+
+    except (PyMongoError, ImproperlyConfigured, ValueError) as exc:
+        return _database_error_response(exc)
+
+    return Response({
+        "success": True,
+        "event_id": event_id,
+        "total_checked": len(unique_names),
+        "already_uploaded_count": len(already_uploaded),
+        "new_images_count": len(new_images),
+        "already_uploaded": already_uploaded,
+        "new_images": new_images,
+    })
+
+
+check_existing_photos.throttle_scope = "read"

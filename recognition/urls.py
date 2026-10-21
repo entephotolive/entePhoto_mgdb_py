@@ -7,6 +7,7 @@ from .views import (
     scan_face,
     upload_images,
     cleanup_expired_events,
+    check_existing_photos,
 )
 
 urlpatterns = [
@@ -17,4 +18,5 @@ urlpatterns = [
     path("photo/<int:id>/", delete_photo),
     path("health/", health),
     path("cron/cleanup-expired-events/", cleanup_expired_events),
+    path("check-existing-photos/", check_existing_photos),
 ]

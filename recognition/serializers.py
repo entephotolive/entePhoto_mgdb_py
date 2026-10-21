@@ -29,3 +29,34 @@ class MyPhotosSerializer(serializers.Serializer):
         if not ObjectId.is_valid(value):
             raise serializers.ValidationError("Invalid event_id")
         return value
+    
+#---------------------------------------------
+    
+
+
+
+class CheckExistingPhotosSerializer(serializers.Serializer):
+    event_id = serializers.CharField()
+    image_names = serializers.ListField(
+        child=serializers.CharField(
+            allow_blank=False,
+            trim_whitespace=False,
+        ),
+        allow_empty=False,
+        max_length=500,
+    )
+
+    def validate_event_id(self, value):
+        if not ObjectId.is_valid(value):
+            raise serializers.ValidationError("Invalid event_id")
+        return value
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
