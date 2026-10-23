@@ -1,7 +1,9 @@
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import numpy as np
 from bson.objectid import ObjectId
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -13,36 +15,46 @@ from rest_framework.decorators import (
     permission_classes,
 )
 from rest_framework.permissions import IsAuthenticated
-from mobile_auth.views import PhotographerJWTAuthentication
 from rest_framework.response import Response
-import numpy as np
+
 from config.mongo import assert_database_ready, ping_database
+from mobile_auth.views import PhotographerJWTAuthentication
+
 from .repositories import (
     allocate_image_ids,
     count_photo_matches_for_attendee,
+    create_attendee,
     create_event_photo,
+    create_session,
     create_unprocessed_event_photo,
-    delete_photo_document,
     delete_event_face_encodings,
     delete_photo_by_image_id,
-    get_session_by_token,
+    delete_photo_document,
     find_existing_event_image_names,
     get_event_by_object_id,
     get_photos_by_image_ids,
+    get_session_by_token,
+    insert_face_encodings_for_event,
     list_attendees_by_event_id,
+    list_event_photos,
+    list_face_encodings_by_event_id,
     list_photo_matches_for_attendee,
     touch_attendee,
     touch_session_by_token,
-    create_attendee,
-    create_session,
-    insert_face_encodings_for_event,
-    list_event_photos,
-    list_face_encodings_by_event_id,
     upsert_attendee_photo_matches,
     upsert_photo_matches,
+    cleanup_events_expired_after_10_days,
 )
-from .serializers import MyPhotosSerializer, ScanFaceSerializer, UploadImagesSerializer, CheckExistingPhotosSerializer
-from .services.face_encode import encode_faces_from_file, encode_single_face_from_file
+from .serializers import (
+    CheckExistingPhotosSerializer,
+    MyPhotosSerializer,
+    ScanFaceSerializer,
+    UploadImagesSerializer,
+)
+from .services.face_encode import (
+    encode_faces_from_file,
+    encode_single_face_from_file,
+)
 from .services.face_match import (
     find_matching_attendee_id,
     find_matching_image_ids,
@@ -51,7 +63,7 @@ from .services.face_match import (
 )
 from .tasks import process_event_photo_faces
 from .notify import notify_attendee_new_match
-from .repositories import cleanup_events_expired_after_10_days
+
 
 def _database_error_response(exc: Exception):
     return Response({"error": "Database operation failed", "details": str(exc)}, status=500)
@@ -782,11 +794,16 @@ check_existing_photos.throttle_scope = "read"
 
 #-----------------------
 
-@api_view(["POST"])
+
+
+
+@api_view(["GET"])
 @authentication_classes([PhotographerJWTAuthentication])
 @permission_classes([IsAuthenticated])
 def check_existing_photos(request):
-    serializer = CheckExistingPhotosSerializer(data=request.data)
+    serializer = CheckExistingPhotosSerializer(
+        data=request.query_params
+    )
 
     if not serializer.is_valid():
         return Response(
@@ -798,43 +815,30 @@ def check_existing_photos(request):
         )
 
     event_id = serializer.validated_data["event_id"]
-    image_names = serializer.validated_data["image_names"]
 
     event_object_id, _event, error_response = _require_event(event_id)
+
     if error_response is not None:
         return error_response
 
     try:
-        # Remove duplicate filenames from the request, preserving order.
-        unique_names = list(dict.fromkeys(image_names))
+        
+        photos = list_event_photos(event_object_id)
 
-        # Get filenames already saved for this event.
-        existing_names = find_existing_event_image_names(
-            event_object_id,
-            unique_names,
+       
+        image_names = list(
+            dict.fromkeys(
+                photo["image_name"]
+                for photo in photos
+                if photo.get("image_name")
+            )
         )
-
-        already_uploaded = [
-            name for name in unique_names
-            if name in existing_names
-        ]
-
-        new_images = [
-            name for name in unique_names
-            if name not in existing_names
-        ]
 
     except (PyMongoError, ImproperlyConfigured, ValueError) as exc:
         return _database_error_response(exc)
 
     return Response({
-        "success": True,
-        "event_id": event_id,
-        "total_checked": len(unique_names),
-        "already_uploaded_count": len(already_uploaded),
-        "new_images_count": len(new_images),
-        "already_uploaded": already_uploaded,
-        "new_images": new_images,
+        "image_names": image_names,
     })
 
 
