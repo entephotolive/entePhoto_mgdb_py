@@ -7,7 +7,13 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from PIL import Image, UnidentifiedImageError
 from pymongo.errors import PyMongoError
-from rest_framework.decorators import api_view
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    permission_classes,
+)
+from rest_framework.permissions import IsAuthenticated
+from mobile_auth.views import PhotographerJWTAuthentication
 from rest_framework.response import Response
 import numpy as np
 from config.mongo import assert_database_ready, ping_database
@@ -777,6 +783,8 @@ check_existing_photos.throttle_scope = "read"
 #-----------------------
 
 @api_view(["POST"])
+@authentication_classes([PhotographerJWTAuthentication])
+@permission_classes([IsAuthenticated])
 def check_existing_photos(request):
     serializer = CheckExistingPhotosSerializer(data=request.data)
 
